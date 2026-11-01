@@ -29,20 +29,6 @@ archives:
 checksum:
   name_template: checksums.txt
 
-# Signing + notarization, so Gatekeeper doesn't block downloaded binaries.
-# Needs an Apple Developer ID certificate and App Store Connect API key in CI secrets.
-notarize:
-  macos:
-    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
-      sign:
-        certificate: "{{.Env.MACOS_SIGN_P12}}"
-        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
-      notarize:
-        issuer_id: "{{.Env.MACOS_NOTARY_ISSUER_ID}}"
-        key_id: "{{.Env.MACOS_NOTARY_KEY_ID}}"
-        key: "{{.Env.MACOS_NOTARY_KEY}}"
-        wait: true
-
 # Publishes to github.com/colt005/homebrew-tap so users can
 # `brew install colt005/tap/relai`. Create that repo first.
 homebrew_casks:
