@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>RelaiBar</string>
+	<key>CFBundleDisplayName</key>
+	<string>RelaiBar</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.relai.bar</string>
+	<key>CFBundleExecutable</key>
+	<string>RelaiBar</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<!-- Menu bar only: no Dock icon or app menu. -->
+	<key>LSUIElement</key>
+	<true/>
+	<!-- relai opens sessions in Terminal/iTerm via AppleScript; macOS asks once. -->
+	<key>NSAppleEventsUsageDescription</key>
+	<string>RelaiBar opens agent sessions in a new Terminal or iTerm window.</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>
