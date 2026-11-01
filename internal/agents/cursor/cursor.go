@@ -114,14 +114,19 @@ func decodeProjectDir(name string, exists func(string) bool) string {
 	return prefix + "/" + cur
 }
 
-func (a *Adapter) Transcript(path string) (s.Transcript, error) {
+func (a *Adapter) Transcript(path string) (s.Transcript, error) { return a.TranscriptUpTo(path, 0) }
+
+// Records and TranscriptUpTo make Adapter an s.Snapshotter.
+func (a *Adapter) Records(path string) (int, error) { return jsonl.CountFile(path) }
+
+func (a *Adapter) TranscriptUpTo(path string, records int) (s.Transcript, error) {
 	var tr s.Transcript
 	add := func(r s.Role, text string) {
 		if strings.TrimSpace(text) != "" {
 			tr.Msgs = append(tr.Msgs, s.Msg{Role: r, Text: text})
 		}
 	}
-	err := jsonl.EachFile(path, func(o map[string]any) bool {
+	err := jsonl.EachFileN(path, records, func(o map[string]any) bool {
 		role := s.Str(o, "role")
 		if role != "user" && role != "assistant" {
 			return true
@@ -130,7 +135,8 @@ func (a *Adapter) Transcript(path string) (s.Transcript, error) {
 			t := s.Str(b, "type")
 			switch {
 			case isToolUse(t):
-				add(s.ToolCall, s.FmtTool(s.Str(b, "name"), b["input"]))
+				tr.Msgs = append(tr.Msgs, s.Msg{Role: s.ToolCall,
+					Text: s.FmtTool(s.Str(b, "name"), b["input"]), Full: s.FmtToolInput(b["input"])})
 			case isToolResult(t):
 				add(s.ToolResult, s.Flatten(b["content"]))
 			case t == "thinking":

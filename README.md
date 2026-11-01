@@ -54,6 +54,23 @@ When handing off, the current agent writes a briefing from everything it knows r
 the goal, what's done, what's broken, and what's next. relai then opens the other agent
 with that briefing and a condensed transcript.
 
+## Getting the full detail
+
+A handoff file is condensed: long messages and tool output are clipped, and a very long
+session loses its middle. Where something was cut, it carries a marker like
+`[full L1840–1902]`. The header shows the command that makes the complete transcript:
+
+```sh
+relai full claude:3f2a9c --snapshot 812   # prints the path of the full transcript
+relai full claude:3f2a9c --stdout         # or prints it
+relai clean                               # deletes every cached transcript
+```
+
+The copy is made on demand, with secrets masked, and `--snapshot` pins it to the point
+the handoff described, so it matches the handoff even if the session has grown since.
+There is one file per session and snapshot in `~/.relai/cache/full` (private to you),
+reused until it hasn't been used for 7 days.
+
 ## Menu bar app
 
 **RelaiBar** puts your sessions one click away. Search, resume, or continue any session in

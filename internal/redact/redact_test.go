@@ -75,3 +75,15 @@ func TestNoDoubleCount(t *testing.T) {
 		t.Errorf("got %q, total %d", got, r.Total())
 	}
 }
+
+func TestMaskingKeepsTheLineCount(t *testing.T) {
+	r, _ := New("")
+	in := "before\n-----BEGIN RSA PRIVATE KEY-----\nMIIEow\nabcdef\n-----END RSA PRIVATE KEY-----\nafter\n"
+	out := r.String(in)
+	if strings.Count(out, "\n") != strings.Count(in, "\n") {
+		t.Errorf("line count changed: %d -> %d\n%q", strings.Count(in, "\n"), strings.Count(out, "\n"), out)
+	}
+	if strings.Contains(out, "MIIEow") || !strings.Contains(out, "before") || !strings.Contains(out, "after") {
+		t.Errorf("unexpected output %q", out)
+	}
+}

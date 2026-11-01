@@ -40,12 +40,28 @@ func (z *zstReader) Close() error               { z.d.Close(); return z.f.Close(
 
 // Each calls fn with every JSON object in r. Lines that don't decode are skipped
 // (a file that's being written can end with a torn line). fn returns false to stop.
-func Each(r io.Reader, fn func(obj map[string]any) bool) error {
+func Each(r io.Reader, fn func(obj map[string]any) bool) error { return each(r, 0, fn) }
+
+// isRecord reports whether a line counts as a record. A final line without its
+// newline is only a record once it is complete JSON, so a record that is still being
+// written is not counted until it is whole.
+func isRecord(line []byte, terminated bool) bool {
+	return len(line) > 0 && line[0] == '{' && (terminated || json.Valid(line))
+}
+
+// each is Each that stops after limit records (limit <= 0: no limit). Records are
+// counted as lines, whether or not they decode, so CountFile and a limit agree.
+func each(r io.Reader, limit int, fn func(obj map[string]any) bool) error {
 	br := bufio.NewReaderSize(r, 256*1024)
+	seen := 0
 	for {
 		line, err := br.ReadBytes('\n')
 		line = bytes.TrimSpace(line)
-		if len(line) > 0 && line[0] == '{' {
+		if isRecord(line, err == nil) {
+			if limit > 0 && seen >= limit {
+				return nil
+			}
+			seen++
 			var obj map[string]any
 			dec := json.NewDecoder(bytes.NewReader(line))
 			dec.UseNumber()
@@ -70,6 +86,39 @@ func EachFile(path string, fn func(obj map[string]any) bool) error {
 	}
 	defer r.Close()
 	return Each(r, fn)
+}
+
+// EachFileN is EachFile that stops after the first n records (n <= 0: no limit).
+func EachFileN(path string, n int, fn func(obj map[string]any) bool) error {
+	r, err := Open(path)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	return each(r, n, fn)
+}
+
+// CountFile returns how many records path has, counted the way EachFileN limits.
+func CountFile(path string) (int, error) {
+	r, err := Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+	br := bufio.NewReaderSize(r, 256*1024)
+	n := 0
+	for {
+		line, err := br.ReadBytes('\n')
+		if isRecord(bytes.TrimSpace(line), err == nil) {
+			n++
+		}
+		if err == io.EOF {
+			return n, nil
+		}
+		if err != nil {
+			return n, err
+		}
+	}
 }
 
 // Scan reads a session file once, decoding as little as possible:
