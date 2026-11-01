@@ -19,7 +19,10 @@ codesign --force --sign - "$APP" >/dev/null
 
 echo "built $APP"
 if [ "${1:-}" = "--install" ]; then
-  pkill -x RelaiBar 2>/dev/null || true
+  if pkill -x RelaiBar 2>/dev/null; then
+    # Wait for it to exit, or `open` can fail with error -600 (process not found).
+    for _ in $(seq 1 25); do pgrep -x RelaiBar >/dev/null || break; sleep 0.2; done
+  fi
   rm -rf /Applications/RelaiBar.app
   cp -R "$APP" /Applications/
   open /Applications/RelaiBar.app
