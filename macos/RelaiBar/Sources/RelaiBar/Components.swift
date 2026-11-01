@@ -346,6 +346,14 @@ struct SettingsPanel: View {
                 Picker("Open sessions in", selection: $store.terminal) {
                     Text("Terminal").tag("Terminal")
                     Text("iTerm2").tag("iTerm")
+                    if Store.cmuxInstalled || store.terminal == "cmux" {
+                        Text("cmux").tag("cmux")
+                    }
+                }
+                if store.terminal == "cmux" {
+                    Text("cmux only accepts commands from other apps when Settings > Automation allows external access. Otherwise sessions won't open.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
                 Toggle("Launch at login", isOn: Binding(
                     get: { store.launchAtLogin },

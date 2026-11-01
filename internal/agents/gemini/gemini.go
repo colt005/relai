@@ -57,12 +57,13 @@ type file struct {
 	msgs []map[string]any
 }
 
-func load(path string) (file, error) {
+// load parses a session file; records > 0 keeps only the first records records.
+func load(path string, records int) (file, error) {
 	var f file
 	if strings.HasSuffix(path, ".jsonl") {
 		f.head = map[string]any{}
 		index := map[string]int{}
-		err := jsonl.EachFile(path, func(o map[string]any) bool {
+		err := jsonl.EachFileN(path, records, func(o map[string]any) bool {
 			if set := s.Obj(o, "$set"); set != nil {
 				for k, v := range set {
 					f.head[k] = v
@@ -102,6 +103,9 @@ func load(path string) (file, error) {
 			}
 		}
 	}
+	if records > 0 && len(f.msgs) > records {
+		f.msgs = f.msgs[:records]
+	}
 	return f, nil
 }
 
@@ -138,7 +142,7 @@ func (a *Adapter) Meta(path string) (s.Session, error) {
 	if err != nil {
 		return s.Session{}, err
 	}
-	f, err := load(path)
+	f, err := load(path, 0)
 	if err != nil {
 		return s.Session{}, err
 	}
@@ -199,9 +203,21 @@ func resolveCWD(projectDir, hash string) string {
 	return ""
 }
 
-func (a *Adapter) Transcript(path string) (s.Transcript, error) {
+func (a *Adapter) Transcript(path string) (s.Transcript, error) { return a.TranscriptUpTo(path, 0) }
+
+// Records and TranscriptUpTo make Adapter an s.Snapshotter. A .jsonl session counts
+// source lines; a legacy .json session counts messages.
+func (a *Adapter) Records(path string) (int, error) {
+	if strings.HasSuffix(path, ".jsonl") {
+		return jsonl.CountFile(path)
+	}
+	f, err := load(path, 0)
+	return len(f.msgs), err
+}
+
+func (a *Adapter) TranscriptUpTo(path string, records int) (s.Transcript, error) {
 	var tr s.Transcript
-	f, err := load(path)
+	f, err := load(path, records)
 	if err != nil {
 		return tr, err
 	}
@@ -226,7 +242,8 @@ func (a *Adapter) Transcript(path string) (s.Transcript, error) {
 				if !ok {
 					continue
 				}
-				add(s.ToolCall, s.FmtTool(s.Str(cm, "name"), cm["args"]), m)
+				tr.Msgs = append(tr.Msgs, s.Msg{Role: s.ToolCall, TS: s.ParseTime(m["timestamp"]),
+					Text: s.FmtTool(s.Str(cm, "name"), cm["args"]), Full: s.FmtToolInput(cm["args"])})
 				if out := toolOutput(cm); out != "" {
 					if s.Str(cm, "status") == "error" {
 						out = "ERROR: " + out

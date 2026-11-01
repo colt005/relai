@@ -91,6 +91,12 @@ final class Store: ObservableObject {
         }
     }
 
+    /// cmux is offered as a terminal only when it's installed.
+    static var cmuxInstalled: Bool {
+        ["/Applications/cmux.app", NSHomeDirectory() + "/Applications/cmux.app"]
+            .contains { FileManager.default.fileExists(atPath: $0) }
+    }
+
     let cli = RelaiCLI()
     private var noticeTask: Task<Void, Never>?
 

@@ -28,7 +28,8 @@ For development, `swift run` starts it straight from the package.
   selected session, esc close the peek or clear the search. The search box is focused whenever the popover opens.
 - Rest the pointer on a session for 1.5 seconds and a preview pops out beside the
   window, showing where the session left off. It can be turned off in settings.
-- Sessions open in a new Terminal window, or iTerm2 if you pick it in settings. The first
+- Sessions open in a new Terminal window, or iTerm2 or cmux if you pick one in settings.
+  cmux only takes commands from other apps if Settings > Automation allows it. The first
   time, macOS asks permission for RelaiBar to control Terminal: allow it.
 
 ## How it works

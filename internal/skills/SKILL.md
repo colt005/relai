@@ -26,9 +26,13 @@ Codex uses `-a codex`, Gemini CLI `-a gemini`, Cursor `-a cursor`. A session ref
 4. Tell the user in a few lines what the earlier session was doing, where it stopped,
    and what you'd do next. Then wait for confirmation.
 
-If you need more detail than the condensed view gives, the header lists the original
-transcript path. Search it with grep instead of reading the whole file, and remember the
-original file is not redacted, so don't repeat secrets from it.
+If you need more detail than the condensed view gives, run the `relai full …` command
+shown in the header. It prints the path of a complete transcript with secrets masked,
+made on demand and pinned to the snapshot the handoff describes. It can be large, so
+search it (`grep -n`, or read a line range) instead of reading it whole. The
+`[full L120–180]` markers in the condensed transcript give the line range for the
+item they follow. Don't go looking for the agent's raw session files: they are not
+masked.
 
 ## Handing the current session off to another agent
 

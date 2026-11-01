@@ -179,14 +179,19 @@ func (a *Adapter) Meta(path string) (s.Session, error) {
 	return sess, nil
 }
 
-func (a *Adapter) Transcript(path string) (s.Transcript, error) {
+func (a *Adapter) Transcript(path string) (s.Transcript, error) { return a.TranscriptUpTo(path, 0) }
+
+// Records and TranscriptUpTo make Adapter an s.Snapshotter.
+func (a *Adapter) Records(path string) (int, error) { return jsonl.CountFile(path) }
+
+func (a *Adapter) TranscriptUpTo(path string, records int) (s.Transcript, error) {
 	var tr s.Transcript
 	add := func(r s.Role, text string, ts time.Time) {
 		if strings.TrimSpace(text) != "" {
 			tr.Msgs = append(tr.Msgs, s.Msg{Role: r, Text: text, TS: ts})
 		}
 	}
-	err := jsonl.EachFile(path, func(o map[string]any) bool {
+	err := jsonl.EachFileN(path, records, func(o map[string]any) bool {
 		t := s.Str(o, "type")
 		if (t != "user" && t != "assistant") || s.Bool(o, "isSidechain") {
 			return true
@@ -229,7 +234,8 @@ func (a *Adapter) Transcript(path string) (s.Transcript, error) {
 			case "text":
 				add(s.Assistant, s.Str(bm, "text"), ts)
 			case "tool_use":
-				add(s.ToolCall, s.FmtTool(s.Str(bm, "name"), bm["input"]), ts)
+				tr.Msgs = append(tr.Msgs, s.Msg{Role: s.ToolCall, TS: ts,
+					Text: s.FmtTool(s.Str(bm, "name"), bm["input"]), Full: s.FmtToolInput(bm["input"])})
 			}
 		}
 		return true

@@ -81,7 +81,8 @@ func New(extraFile string) (*Redactor, error) {
 	return r, sc.Err()
 }
 
-// String masks every match in text.
+// String masks every match in text. The result has the same number of lines as the
+// input.
 func (r *Redactor) String(text string) string {
 	if r == nil {
 		return text
@@ -95,13 +96,19 @@ func (r *Redactor) String(text string) string {
 			}
 			r.Count[ru.name]++
 			mask := fmt.Sprintf("[REDACTED:%s]", ru.name)
+			out := mask
 			switch {
 			case ru.keep == 1 && len(sub) > 1:
-				return sub[1] + mask
+				out = sub[1] + mask
 			case ru.keep == 2 && len(sub) > 2:
-				return sub[1] + mask + sub[2]
+				out = sub[1] + mask + sub[2]
 			}
-			return mask
+			// Keep the line count unchanged (a masked private key spans many lines):
+			// line numbers into a redacted transcript must match the original's.
+			if extra := strings.Count(m, "\n") - strings.Count(out, "\n"); extra > 0 {
+				out += strings.Repeat("\n", extra)
+			}
+			return out
 		})
 	}
 	return text

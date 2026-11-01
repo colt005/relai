@@ -133,3 +133,38 @@ func TestThirdPartyFixtures(t *testing.T) {
 		}
 	}
 }
+
+func TestSnapshotIgnoresLaterRecords(t *testing.T) {
+	root := t.TempDir()
+	a := &Adapter{Root: root}
+	p := place(t, root, "../../../testdata/claude/basic.jsonl", "11111111-2222-3333-4444-555555555555.jsonl")
+	n, err := a.Records(p)
+	if err != nil || n == 0 {
+		t.Fatalf("records %d, err %v", n, err)
+	}
+	before, _ := a.TranscriptUpTo(p, n)
+
+	f, _ := os.OpenFile(p, os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString(`{"type":"user","timestamp":"2026-11-01T20:00:00Z","message":{"role":"user","content":"LATER WORK"}}` + "\n")
+	f.Close()
+
+	if m, _ := a.Records(p); m != n+1 {
+		t.Errorf("records after append: %d, want %d", m, n+1)
+	}
+	pinned, _ := a.TranscriptUpTo(p, n)
+	all, _ := a.Transcript(p)
+	if len(pinned.Msgs) != len(before.Msgs) || strings.Contains(flat(pinned), "LATER WORK") {
+		t.Error("a pinned snapshot must not see later records")
+	}
+	if !strings.Contains(flat(all), "LATER WORK") {
+		t.Error("the unpinned transcript should include the new record")
+	}
+}
+
+func flat(tr s.Transcript) string {
+	var b strings.Builder
+	for _, m := range tr.Msgs {
+		b.WriteString(m.Text + "\n")
+	}
+	return b.String()
+}

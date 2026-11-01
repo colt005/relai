@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/colt005/relai/internal/agents"
+	"github.com/colt005/relai/internal/fullcache"
 	"github.com/colt005/relai/internal/index"
 	"github.com/colt005/relai/internal/launch"
 	"github.com/colt005/relai/internal/redact"
@@ -67,6 +68,8 @@ const usage = `relai - browse, resume, and hand off sessions between coding agen
 Usage:
   relai list    [-a AGENT] [--here] [-n 30] [--all] [--json]
   relai show    <ref> [--max-chars N] [--no-tool-output] [--no-redact]
+  relai full    <ref> [--snapshot N] [--stdout]
+  relai clean
   relai resume  <ref> [--new-window]
   relai handoff <ref> --to AGENT [--note FILE] [--summarize] [--prompt TEXT]
                 [--cd DIR] [--no-launch] [--new-window] [--no-redact]
@@ -80,7 +83,7 @@ Usage:
 Commands taking <ref> also accept -a AGENT and --here to narrow it.
 Agents: claude, codex, gemini, cursor.
 
-Environment: RELAI_HOME (default ~/.relai), RELAI_TERMINAL (Terminal|iTerm),
+Environment: RELAI_HOME (default ~/.relai), RELAI_TERMINAL (Terminal|iTerm|cmux),
 CLAUDE_CONFIG_DIR, CODEX_HOME. Extra redaction patterns: $RELAI_HOME/redact.txt.
 `
 
@@ -90,7 +93,7 @@ func main() {
 		os.Exit(2)
 	}
 	cmds := map[string]func([]string) error{
-		"list": cmdList, "ls": cmdList, "show": cmdShow, "resume": cmdResume,
+		"list": cmdList, "ls": cmdList, "show": cmdShow, "full": cmdFull, "clean": cmdClean, "resume": cmdResume,
 		"handoff": cmdHandoff, "launch": cmdLaunch, "pick": cmdPick,
 		"install-skills": cmdInstallSkills, "doctor": cmdDoctor,
 		"version":   func([]string) error { fmt.Println("relai", versionString()); return nil },
@@ -253,17 +256,52 @@ func resolve(ref string, f filter) (session.Session, error) {
 	return session.Session{}, errors.New(b.String())
 }
 
-func renderSession(s session.Session, maxChars int, toolOutput bool, red *redact.Redactor) (string, error) {
-	ad := agents.All()[s.Agent]
-	tr, err := ad.Transcript(s.Path)
+// loadTranscript parses a session. When the adapter can snapshot, it covers the first
+// snapshot records (0 = everything so far) and returns that count; adapters that
+// can't snapshot return 0.
+func loadTranscript(ad session.Adapter, path string, snapshot int) (int, session.Transcript, error) {
+	sn, ok := ad.(session.Snapshotter)
+	if !ok {
+		tr, err := ad.Transcript(path)
+		return 0, tr, err
+	}
+	n, err := sn.Records(path)
 	if err != nil {
-		return "", err
+		return 0, session.Transcript{}, err
+	}
+	if snapshot > 0 {
+		if snapshot > n {
+			return 0, session.Transcript{}, fmt.Errorf("the session now has %d records, fewer than the snapshot's %d; "+
+				"it was rewritten since the handoff", n, snapshot)
+		}
+		n = snapshot
+	}
+	tr, err := sn.TranscriptUpTo(path, n)
+	return n, tr, err
+}
+
+// fullCommand is what an agent runs to get the complete transcript of a snapshot.
+func fullCommand(s session.Session, snapshot int) string {
+	cmd := fmt.Sprintf("relai full %s:%s", s.Agent, s.ID)
+	if snapshot > 0 {
+		cmd += fmt.Sprintf(" --snapshot %d", snapshot)
+	}
+	return cmd
+}
+
+// renderSession renders the condensed transcript and returns the snapshot it covers.
+func renderSession(s session.Session, maxChars int, toolOutput bool, red *redact.Redactor) (string, int, error) {
+	ad := agents.All()[s.Agent]
+	snap, tr, err := loadTranscript(ad, s.Path, 0)
+	if err != nil {
+		return "", 0, err
 	}
 	doc := render.Transcript(s, tr, render.Options{
 		MaxChars: maxChars, ToolOutput: toolOutput, AgentLabel: ad.Label(),
 		ResumeCmd: launch.Join(ad.ResumeCmd(s)),
+		Snapshot:  snap, FullCmd: fullCommand(s, snap),
 	})
-	return red.String(doc), nil
+	return red.String(doc), snap, nil
 }
 
 // ---------------------------------------------------------------- list
@@ -356,11 +394,81 @@ func cmdShow(args []string) error {
 	if err != nil {
 		return err
 	}
-	doc, err := renderSession(s, *maxChars, !*noTools, red)
+	doc, _, err := renderSession(s, *maxChars, !*noTools, red)
 	if err != nil {
 		return err
 	}
 	fmt.Print(doc)
+	return nil
+}
+
+// cmdFull writes the complete transcript of a session, secrets masked, to a cached
+// file and prints its path. The cache holds one file per (session, snapshot), made
+// on demand: a handoff pins the snapshot it described, so the copy matches the
+// handoff even if the session has grown since.
+func cmdFull(args []string) error {
+	fs := flag.NewFlagSet("full", flag.ExitOnError)
+	var f filter
+	f.register(fs)
+	snapshot := fs.Int("snapshot", 0, "source records to include (from a handoff file; default: all so far)")
+	toStdout := fs.Bool("stdout", false, "print the transcript instead of its path")
+	pos, err := parseInterspersed(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 {
+		return errors.New("usage: relai full <ref> [--snapshot N] [--stdout]")
+	}
+	s, err := resolve(pos[0], f)
+	if err != nil {
+		return err
+	}
+	ad := agents.All()[s.Agent]
+	home := relaiHome()
+
+	snap := *snapshot
+	if sn, ok := ad.(session.Snapshotter); ok && snap == 0 {
+		if snap, err = sn.Records(s.Path); err != nil {
+			return err
+		}
+	}
+	path := fullcache.Path(home, s.Agent, s.ID, snap)
+	if !fullcache.Exists(path) {
+		snap, tr, err := loadTranscript(ad, s.Path, snap)
+		if err != nil {
+			return err
+		}
+		red, err := newRedactor(false)
+		if err != nil {
+			return err
+		}
+		doc := red.String(render.Full(s, tr, render.Options{
+			AgentLabel: ad.Label(), ResumeCmd: launch.Join(ad.ResumeCmd(s)), Snapshot: snap,
+		}))
+		if err := fullcache.Write(path, []byte(doc)); err != nil {
+			return err
+		}
+	}
+	fullcache.Touch(path)
+	fullcache.Prune(home, fullcache.MaxAge)
+	if *toStdout {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		fmt.Print(string(b))
+		return nil
+	}
+	fmt.Println(path)
+	return nil
+}
+
+func cmdClean(args []string) error {
+	n, err := fullcache.Clean(relaiHome())
+	if err != nil {
+		return err
+	}
+	fmt.Printf("removed %d cached transcript(s)\n", n)
 	return nil
 }
 
@@ -392,11 +500,12 @@ what's broken, what was in progress when the session ended); Decisions & constra
 user asked for or ruled out); Next steps; Gotchas. Be specific: file paths, commands, error messages.
 Only use facts from the transcript. Output only the briefing.`
 
-func handoffPrompt(srcLabel, file, original, extra string) string {
+func handoffPrompt(srcLabel, file, fullCmd, extra string) string {
 	p := fmt.Sprintf("You're continuing work handed off from a previous %s session. Read the handoff file first: %s. ", srcLabel, file)
-	if original != "" {
-		p += fmt.Sprintf("The full original transcript is at %s if you need exact details "+
-			"(it's large, so search it rather than reading it whole). ", original)
+	if fullCmd != "" {
+		p += fmt.Sprintf("If something in it is unclear or you need exact details, run `%s`: it prints the path of "+
+			"the complete session transcript with secrets masked (made on demand). It is large, so search it "+
+			"instead of reading it whole; the [full L…] markers in the handoff file give the relevant line ranges. ", fullCmd)
 	}
 	p += "Then tell me in a few lines where things stand and what you'd do next, " +
 		"and wait for my go-ahead before changing anything."
@@ -453,7 +562,7 @@ func doHandoff(s session.Session, o handoffOpts) error {
 	if err != nil {
 		return err
 	}
-	doc, err := renderSession(s, o.maxChars, true, red)
+	doc, snap, err := renderSession(s, o.maxChars, true, red)
 	if err != nil {
 		return err
 	}
@@ -500,7 +609,7 @@ func doHandoff(s session.Session, o handoffOpts) error {
 	if dirTo == "" {
 		dirTo = s.CWD
 	}
-	return launch.Run(target.LaunchCmd(handoffPrompt(src.Label(), out, s.Path, o.prompt)), dirTo, o.newWindow)
+	return launch.Run(target.LaunchCmd(handoffPrompt(src.Label(), out, fullCommand(s, snap), o.prompt)), dirTo, o.newWindow)
 }
 
 func summarize(ad session.Adapter, s session.Session, srcLabel, transcript string) (string, error) {
@@ -666,8 +775,12 @@ func cmdInstallSkills(args []string) error {
 func cmdDoctor(args []string) error {
 	fmt.Println("relai", versionString())
 	fmt.Println("home:", relaiHome())
-	for _, bin := range []string{"claude", "codex", "gemini", "cursor-agent", "fzf"} {
-		if p, err := exec.LookPath(bin); err == nil {
+	for _, bin := range []string{"claude", "codex", "gemini", "cursor-agent", "cmux", "fzf"} {
+		p, err := exec.LookPath(bin)
+		if err != nil && bin == "cmux" {
+			p, err = launch.CmuxBin() // also finds it inside the app bundle
+		}
+		if err == nil {
 			fmt.Printf("  %-12s %s\n", bin, p)
 		} else {
 			fmt.Printf("  %-12s not found on PATH\n", bin)

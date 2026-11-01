@@ -180,11 +180,11 @@ func msgs(o map[string]any) []s.Msg {
 		if args == nil {
 			args = it["input"]
 		}
-		return []s.Msg{{Role: s.ToolCall, Text: s.FmtTool(name, decodeMaybeJSON(args)), TS: ts}}
+		return []s.Msg{{Role: s.ToolCall, Text: s.FmtTool(name, decodeMaybeJSON(args)), TS: ts, Full: s.FmtToolInput(decodeMaybeJSON(args))}}
 	case "local_shell_call":
-		return []s.Msg{{Role: s.ToolCall, Text: s.FmtTool("shell", s.Obj(it, "action")), TS: ts}}
+		return []s.Msg{{Role: s.ToolCall, Text: s.FmtTool("shell", s.Obj(it, "action")), TS: ts, Full: s.FmtToolInput(s.Obj(it, "action"))}}
 	case "web_search_call":
-		return []s.Msg{{Role: s.ToolCall, Text: s.FmtTool("web_search", s.Obj(it, "action")), TS: ts}}
+		return []s.Msg{{Role: s.ToolCall, Text: s.FmtTool("web_search", s.Obj(it, "action")), TS: ts, Full: s.FmtToolInput(s.Obj(it, "action"))}}
 	case "function_call_output", "custom_tool_call_output":
 		return []s.Msg{{Role: s.ToolResult, Text: toolOutput(it["output"]), TS: ts}}
 	case "tool_result":
@@ -293,10 +293,15 @@ func (a *Adapter) Meta(path string) (s.Session, error) {
 
 var cwdTagRe = regexp.MustCompile(`<cwd>(.*?)</cwd>`)
 
-func (a *Adapter) Transcript(path string) (s.Transcript, error) {
+func (a *Adapter) Transcript(path string) (s.Transcript, error) { return a.TranscriptUpTo(path, 0) }
+
+// Records and TranscriptUpTo make Adapter an s.Snapshotter.
+func (a *Adapter) Records(path string) (int, error) { return jsonl.CountFile(path) }
+
+func (a *Adapter) TranscriptUpTo(path string, records int) (s.Transcript, error) {
 	var tr s.Transcript
 	var events []s.Msg
-	err := jsonl.EachFile(path, func(o map[string]any) bool {
+	err := jsonl.EachFileN(path, records, func(o map[string]any) bool {
 		tr.Msgs = append(tr.Msgs, msgs(o)...)
 		if s.Str(o, "type") == "event_msg" {
 			p := s.Obj(o, "payload")

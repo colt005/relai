@@ -42,6 +42,8 @@ type Msg struct {
 	Role Role
 	Text string
 	TS   time.Time
+	// Full is the unabridged form of a tool call's input, when Text clips it.
+	Full string
 }
 
 type Transcript struct {
@@ -68,6 +70,16 @@ type Adapter interface {
 	// stdin. If outFile is non-empty the agent writes its answer there; otherwise
 	// the answer is read from stdout.
 	SummarizeCmd(prompt, outFile string) []string
+}
+
+// Snapshotter is implemented by adapters that can render a session as it was after
+// its first N source records. A handoff records N, so the full transcript made later
+// matches the handoff even if the session has since grown.
+type Snapshotter interface {
+	// Records returns how many source records the session has now.
+	Records(path string) (int, error)
+	// TranscriptUpTo parses only the first records records (<= 0 means all).
+	TranscriptUpTo(path string, records int) (Transcript, error)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -143,6 +155,15 @@ func FmtTool(name string, input any) string {
 		return fmt.Sprintf("%s(%s)", name, OneLine(in, 200))
 	}
 	return name + "()"
+}
+
+// FmtToolInput returns a tool call's input as indented JSON, unclipped.
+func FmtToolInput(input any) string {
+	b, err := json.MarshalIndent(input, "", "  ")
+	if err != nil {
+		return fmt.Sprint(input)
+	}
+	return string(b)
 }
 
 func commandString(v any) string {
