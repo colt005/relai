@@ -114,7 +114,7 @@ Masking is a safety net, not a guarantee. Review a handoff before sharing it fur
 | Variable | Purpose | Default |
 |---|---|---|
 | `RELAI_HOME` | Where relai keeps handoffs and its index | `~/.relai` |
-| `RELAI_TERMINAL` | `Terminal` or `iTerm` for `--new-window` | `Terminal` |
+| `RELAI_TERMINAL` | `Terminal`, `iTerm` or `cmux` for `--new-window` | `Terminal` |
 | `CLAUDE_CONFIG_DIR` | Claude Code's data folder, if moved | `~/.claude` |
 | `CODEX_HOME` | Codex's data folder, if moved | `~/.codex` |
 

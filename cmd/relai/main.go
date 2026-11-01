@@ -80,7 +80,7 @@ Usage:
 Commands taking <ref> also accept -a AGENT and --here to narrow it.
 Agents: claude, codex, gemini, cursor.
 
-Environment: RELAI_HOME (default ~/.relai), RELAI_TERMINAL (Terminal|iTerm),
+Environment: RELAI_HOME (default ~/.relai), RELAI_TERMINAL (Terminal|iTerm|cmux),
 CLAUDE_CONFIG_DIR, CODEX_HOME. Extra redaction patterns: $RELAI_HOME/redact.txt.
 `
 
@@ -666,8 +666,12 @@ func cmdInstallSkills(args []string) error {
 func cmdDoctor(args []string) error {
 	fmt.Println("relai", versionString())
 	fmt.Println("home:", relaiHome())
-	for _, bin := range []string{"claude", "codex", "gemini", "cursor-agent", "fzf"} {
-		if p, err := exec.LookPath(bin); err == nil {
+	for _, bin := range []string{"claude", "codex", "gemini", "cursor-agent", "cmux", "fzf"} {
+		p, err := exec.LookPath(bin)
+		if err != nil && bin == "cmux" {
+			p, err = launch.CmuxBin() // also finds it inside the app bundle
+		}
+		if err == nil {
 			fmt.Printf("  %-12s %s\n", bin, p)
 		} else {
 			fmt.Printf("  %-12s not found on PATH\n", bin)

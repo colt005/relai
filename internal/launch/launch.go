@@ -1,5 +1,5 @@
 // Package launch starts agents, either in the current terminal or in a new
-// Terminal.app / iTerm2 window on macOS.
+// Terminal.app / iTerm2 window or cmux workspace on macOS.
 package launch
 
 import (
@@ -54,6 +54,44 @@ func Run(cmd []string, dir string, newWindow bool) error {
 	return syscall.Exec(bin, cmd, os.Environ())
 }
 
+// CmuxBin finds the cmux CLI: on PATH, or inside the app bundle (a GUI app's PATH
+// usually doesn't include it).
+func CmuxBin() (string, error) {
+	if p, err := exec.LookPath("cmux"); err == nil {
+		return p, nil
+	}
+	home, _ := os.UserHomeDir()
+	for _, dir := range []string{"/Applications", home + "/Applications"} {
+		p := dir + "/cmux.app/Contents/Resources/bin/cmux"
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("cmux isn't installed (couldn't find the cmux command)")
+}
+
+// openInCmux starts cmd in a new cmux workspace. cmux only accepts commands from
+// outside itself when Settings > Automation allows it.
+func openInCmux(cmd []string, dir string) error {
+	bin, err := CmuxBin()
+	if err != nil {
+		return err
+	}
+	line := Join(cmd)
+	out, err := exec.Command(bin, "new-workspace", "--name", "relai", "--cwd", dir,
+		"--command", line, "--focus", "true").CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if strings.Contains(msg, "Access denied") {
+			return fmt.Errorf("cmux refused the request. In cmux, open Settings > Automation and allow " +
+				"external access (socket control mode \"automation\"), then try again")
+		}
+		return fmt.Errorf("cmux: %v: %s", err, msg)
+	}
+	fmt.Fprintf(os.Stderr, "opened in cmux: cd %s && %s\n", Quote(dir), line)
+	return nil
+}
+
 func newTerminalWindow(cmd []string, dir string) error {
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("--new-window is only supported on macOS")
@@ -63,6 +101,8 @@ func newTerminalWindow(cmd []string, dir string) error {
 	app := os.Getenv("RELAI_TERMINAL")
 	var script string
 	switch strings.ToLower(app) {
+	case "cmux":
+		return openInCmux(cmd, dir)
 	case "iterm", "iterm2":
 		script = `tell application "iTerm"
 activate
