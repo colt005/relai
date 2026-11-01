@@ -53,7 +53,17 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/colt005/relai
     description: Browse, resume, and hand off sessions between CLI coding agents (Claude Code, Codex, Gemini CLI, Cursor, and more)
-    binaries: [relai]
+    license: MIT
+    binary: relai
+    # The binary isn't notarized yet, so clear the quarantine flag macOS adds to
+    # downloaded files; otherwise Gatekeeper blocks it on first run.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/relai"]
+          end
 
 changelog:
   sort: asc
