@@ -1,0 +1,15 @@
+{"timestamp":"2026-10-30T12:00:00.000Z","type":"session_meta","payload":{"id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","timestamp":"2026-10-30T12:00:00.000Z","cwd":"/tmp/myapp","source":"cli","git":{"branch":"feat/ws"}}}
+{"timestamp":"2026-10-30T12:00:00.050Z","type":"session_meta","payload":{"id":"99999999-9999-9999-9999-999999999999","cwd":"/elsewhere","source":"cli"}}
+{"timestamp":"2026-10-30T12:00:00.100Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<user_instructions>\n# AGENTS.md stuff\n</user_instructions>"}]}}
+{"timestamp":"2026-10-30T12:00:00.200Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n  <cwd>/tmp/myapp</cwd>\n</environment_context>"}]}}
+{"timestamp":"2026-10-30T12:00:00.300Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<some_future_context>\nx\n</some_future_context>"}]}}
+{"timestamp":"2026-10-30T12:00:00.400Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"developer instructions"}]}}
+{"timestamp":"2026-10-30T12:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Fix the flaky websocket test"}]}}
+{"timestamp":"2026-10-30T12:00:01.000Z","type":"event_msg","payload":{"type":"user_message","message":"Fix the flaky websocket test"}}
+{"timestamp":"2026-10-30T12:00:02.000Z","type":"response_item","payload":{"type":"reasoning","summary":[]}}
+{"timestamp":"2026-10-30T12:00:03.000Z","type":"response_item","payload":{"type":"function_call","name":"shell","arguments":"{\"command\":[\"bash\",\"-lc\",\"npm test -- ws.spec.ts\"]}","call_id":"c1"}}
+{"timestamp":"2026-10-30T12:00:04.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"{\"output\":\"FAIL ws.spec.ts timeout after 5000ms\",\"metadata\":{\"exit_code\":1}}"}}
+{"timestamp":"2026-10-30T12:00:04.500Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":"*** Begin Patch\n*** Update File: ws.spec.ts\n*** End Patch"}}
+{"timestamp":"2026-10-30T12:00:05.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The test races server startup; I'll await the listen callback."}]}}
+{"timestamp":"2026-10-30T12:00:06.000Z","type":"event_msg","payload":{"type":"thread_goal_updated","goal":{"objective":"Make the websocket suite reliable"}}}
+{"timestamp":"2026-10-30T12:00:07.000Z","type":"event_msg","payload":{"type":"thread_name_updated","thread_name":"flaky ws test"}}

@@ -1,0 +1,13 @@
+{"type":"summary","summary":"Old legacy summary","leafUuid":"x"}
+{"type":"user","sessionId":"11111111-2222-3333-4444-555555555555","cwd":"/tmp/myapp","gitBranch":"main","entrypoint":"cli","timestamp":"2026-10-30T10:00:00.123Z","message":{"role":"user","content":"Add rate limiting to the /login endpoint"}}
+{"type":"assistant","cwd":"/tmp/myapp","timestamp":"2026-10-30T10:00:05Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"private"},{"type":"text","text":"I'll look at the auth routes first."},{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/tmp/myapp/src/auth.ts"}}]}}
+{"type":"user","cwd":"/tmp/myapp","timestamp":"2026-10-30T10:00:06Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz0123456789"}]}}
+{"type":"user","isMeta":true,"cwd":"/tmp/myapp","timestamp":"2026-10-30T10:00:07Z","message":{"role":"user","content":"Caveat: injected meta"}}
+{"type":"user","cwd":"/tmp/myapp","timestamp":"2026-10-30T10:01:00Z","message":{"role":"user","content":"<command-message>review</command-message><command-name>/review</command-name><command-args>src</command-args>"}}
+{"type":"user","cwd":"/tmp/myapp","timestamp":"2026-10-30T10:01:01Z","message":{"role":"user","content":"<local-command-stdout>noise</local-command-stdout>"}}
+{"type":"user","isSidechain":true,"cwd":"/tmp/myapp","timestamp":"2026-10-30T10:01:02Z","message":{"role":"user","content":"sidechain prompt"}}
+{"type":"api-request","requestId":"r1"}
+{"type":"user","isCompactSummary":true,"cwd":"/tmp/myapp","timestamp":"2026-10-30T10:01:30Z","message":{"role":"user","content":"This session is being continued from a previous conversation. Summary: limiter added."}}
+{"type":"assistant","cwd":"/tmp/myapp","timestamp":"2026-10-30T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"npm test"}},{"type":"text","text":"Added a token bucket limiter. Tests pass."}]}}
+{"type":"ai-title","aiTitle":"Rate limiting for login","sessionId":"11111111-2222-3333-4444-555555555555"}
+{"type":"custom-title","customTitle":"login limiter","sessionId":"11111111-2222-3333-4444-555555555555"}

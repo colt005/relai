@@ -1,0 +1,5 @@
+{"id":"0199aaaa-0000-7000-8000-000000000000","timestamp":"2025-08-01T09:00:00.000Z","instructions":null}
+{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n<cwd>/Users/me/old</cwd>\n</environment_context>"}]}
+{"type":"message","role":"user","content":[{"type":"input_text","text":"Rename the config module"}]}
+{"type":"local_shell_call","action":{"type":"exec","command":["bash","-lc","git mv config.py settings.py"]}}
+{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Renamed."}]}

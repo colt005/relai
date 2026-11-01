@@ -1,0 +1,61 @@
+# Release: git tag v0.1.0 && git push --tags  (CI runs goreleaser)
+# Check field names against https://goreleaser.com/customization/ for the
+# GoReleaser version you install; the Homebrew section has changed recently.
+version: 2
+
+project_name: relai
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - main: ./cmd/relai
+    binary: relai
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{.Version}}"]
+
+universal_binaries:
+  - replace: true # one macOS binary for Apple Silicon + Intel
+
+archives:
+  - formats: [tar.gz]
+    files: [README.md, LICENSE, THIRD_PARTY_NOTICES.md]
+
+checksum:
+  name_template: checksums.txt
+
+# Signing + notarization, so Gatekeeper doesn't block downloaded binaries.
+# Needs an Apple Developer ID certificate and App Store Connect API key in CI secrets.
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "MACOS_SIGN_P12" }}'
+      sign:
+        certificate: "{{.Env.MACOS_SIGN_P12}}"
+        password: "{{.Env.MACOS_SIGN_PASSWORD}}"
+      notarize:
+        issuer_id: "{{.Env.MACOS_NOTARY_ISSUER_ID}}"
+        key_id: "{{.Env.MACOS_NOTARY_KEY_ID}}"
+        key: "{{.Env.MACOS_NOTARY_KEY}}"
+        wait: true
+
+# Publishes to github.com/colt005/homebrew-tap so users can
+# `brew install colt005/tap/relai`. Create that repo first.
+homebrew_casks:
+  - name: relai
+    repository:
+      owner: colt005
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/colt005/relai
+    description: Browse, resume, and hand off sessions between CLI coding agents (Claude Code, Codex, Gemini CLI, Cursor, and more)
+    binaries: [relai]
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]
