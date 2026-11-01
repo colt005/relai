@@ -57,7 +57,10 @@ with that briefing and a condensed transcript.
 ## Menu bar app
 
 **RelaiBar** puts your sessions one click away. Search, resume, or continue any session in
-the other agent from the menu bar.
+another agent from the menu bar.
+
+It isn't part of the Homebrew install yet (a packaged release is planned), so build it from
+a clone of this repo:
 
 ```sh
 macos/RelaiBar/build-app.sh --install
